@@ -376,7 +376,7 @@ public sealed class ContentUnderstandingService(
 
         for (int i = 0; i < words.Length; i++)
         {
-            var word = new string([.. words[i].Where(char.IsLetterOrDigit)]);
+            var word = new string(words[i].Where(char.IsLetterOrDigit).ToArray());
             if (string.IsNullOrEmpty(word)) continue;
 
             if (i == 0)

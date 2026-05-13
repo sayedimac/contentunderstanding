@@ -250,7 +250,7 @@
     private int CurrentStep { get; set; } = 1;
 
     private string _schemaName = string.Empty;
-    private List<web.Models.SchemaField> _fields = [];
+    private List<web.Models.SchemaField> _fields = new List<web.Models.SchemaField>();
     private string? _fileName;
     private string? _fileContentBase64;
     private string _mimeType = "application/octet-stream";
@@ -351,7 +351,7 @@
     private void StartOver()
     {
         _schemaName = string.Empty;
-        _fields = [];
+        _fields = new List<web.Models.SchemaField>();
         _fileName = null;
         _fileContentBase64 = null;
         _mimeType = "application/octet-stream";
