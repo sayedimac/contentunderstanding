@@ -38,4 +38,24 @@ public sealed class ContentUnderstandingClient(HttpClient httpClient)
         return JsonSerializer.Deserialize<SchemaSubmissionResponse>(responseText, new JsonSerializerOptions(JsonSerializerDefaults.Web))
             ?? throw new InvalidOperationException("The API returned an empty response.");
     }
+
+    public async Task<AnalyzeDocumentResponse> AnalyzeDocumentAsync(
+        AnalyzeDocumentRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.PostAsJsonAsync(
+            "api/content-understanding/analyze",
+            request,
+            cancellationToken);
+
+        var responseText = await response.Content.ReadAsStringAsync(cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(responseText);
+        }
+
+        return JsonSerializer.Deserialize<AnalyzeDocumentResponse>(responseText, new JsonSerializerOptions(JsonSerializerDefaults.Web))
+            ?? throw new InvalidOperationException("The API returned an empty response.");
+    }
 }

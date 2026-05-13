@@ -148,3 +148,90 @@ code {
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
 }
+
+/* ── Step progress indicator ─────────────────────────────────── */
+.step-progress {
+    display: flex;
+    align-items: center;
+}
+
+.step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.step-circle {
+    width: 2.2rem;
+    height: 2.2rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.9rem;
+    background: #e2e8f0;
+    color: #64748b;
+    transition: background 0.2s, color 0.2s;
+}
+
+.step-label {
+    font-size: 0.75rem;
+    color: #64748b;
+    white-space: nowrap;
+}
+
+.step-active .step-circle {
+    background: #1b6ec2;
+    color: #fff;
+}
+
+.step-active .step-label {
+    color: #1b6ec2;
+    font-weight: 600;
+}
+
+.step-done .step-circle {
+    background: #16a34a;
+    color: #fff;
+}
+
+.step-done .step-label {
+    color: #16a34a;
+}
+
+.step-connector {
+    flex: 1;
+    height: 3px;
+    background: #e2e8f0;
+    margin: 0 0.5rem;
+    margin-bottom: 1.4rem;
+    transition: background 0.2s;
+}
+
+.connector-done {
+    background: #16a34a;
+}
+
+/* ── Upload zone ─────────────────────────────────────────────── */
+.upload-zone {
+    border: 2px dashed #cbd5e1;
+    border-radius: 0.75rem;
+    padding: 3rem 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    color: #475569;
+}
+
+.upload-zone:hover {
+    border-color: #1b6ec2;
+    background: #f0f7ff;
+}
+
+.upload-zone-filled {
+    border-color: #16a34a;
+    background: #f0fdf4;
+    color: #15803d;
+}
