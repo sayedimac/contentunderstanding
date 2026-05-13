@@ -1,0 +1,362 @@
+@page "/analyze"
+@using System.Text.Json
+@using Microsoft.AspNetCore.Components.Forms
+@inject web.Services.ContentUnderstandingClient ContentUnderstandingClient
+
+<PageTitle>Analyze Document</PageTitle>
+
+<div class="hero-card mb-4">
+    <p class="eyebrow mb-2">Business User App</p>
+    <h1>Extract information from your documents</h1>
+    <p class="lead mb-0">
+        Tell us what you want to find, upload a document, and we'll pull out the information for you — no technical knowledge required.
+    </p>
+</div>
+
+<!-- Step progress indicator -->
+<div class="step-progress mb-4">
+    <div class="step @(CurrentStep >= 1 ? "step-active" : "") @(CurrentStep > 1 ? "step-done" : "")">
+        <div class="step-circle">@(CurrentStep > 1 ? "✓" : "1")</div>
+        <div class="step-label">Define Fields</div>
+    </div>
+    <div class="step-connector @(CurrentStep > 1 ? "connector-done" : "")"></div>
+    <div class="step @(CurrentStep >= 2 ? "step-active" : "") @(CurrentStep > 2 ? "step-done" : "")">
+        <div class="step-circle">@(CurrentStep > 2 ? "✓" : "2")</div>
+        <div class="step-label">Upload Document</div>
+    </div>
+    <div class="step-connector @(CurrentStep > 2 ? "connector-done" : "")"></div>
+    <div class="step @(CurrentStep >= 3 ? "step-active" : "")">
+        <div class="step-circle">3</div>
+        <div class="step-label">Results</div>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(_errorMessage))
+{
+    <div class="alert alert-danger" role="alert">
+        <strong>Error:</strong> @_errorMessage
+    </div>
+}
+
+<!-- ── Step 1: Define fields ─────────────────────────────────────────────── -->
+@if (CurrentStep == 1)
+{
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-4">
+            <h2 class="h4 mb-1">What information do you want to extract?</h2>
+            <p class="text-body-secondary mb-4">
+                Add the fields you want to pull from your documents. Give each field a clear name and pick its type.
+            </p>
+
+            <div class="mb-4">
+                <label class="form-label fw-semibold" for="schemaName">Schema name</label>
+                <input id="schemaName" class="form-control" placeholder="e.g. Invoice Extractor"
+                       @bind="_schemaName" />
+                <div class="form-text">A short name that identifies what you're extracting.</div>
+            </div>
+
+            @if (_fields.Count > 0)
+            {
+                <div class="table-responsive mb-3">
+                    <table class="table table-bordered align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Field name</th>
+                                <th style="width:160px">Type</th>
+                                <th>Description <span class="text-body-secondary fw-normal">(optional)</span></th>
+                                <th style="width:60px"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var (field, index) in _fields.Select((f, i) => (f, i)))
+                            {
+                                <tr>
+                                    <td>
+                                        <input class="form-control form-control-sm border-0 bg-transparent"
+                                               placeholder="e.g. Invoice Number"
+                                               value="@field.Name"
+                                               @oninput="e => field.Name = e.Value?.ToString() ?? string.Empty" />
+                                    </td>
+                                    <td>
+                                        <select class="form-select form-select-sm"
+                                                value="@field.Type"
+                                                @onchange="e => field.Type = e.Value?.ToString() ?? string.Empty">
+                                            <option value="string">Text</option>
+                                            <option value="number">Number</option>
+                                            <option value="date">Date</option>
+                                            <option value="boolean">Yes / No</option>
+                                            <option value="array">List</option>
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <input class="form-control form-control-sm border-0 bg-transparent"
+                                               placeholder="What does this field represent?"
+                                               value="@field.Description"
+                                               @oninput="e => field.Description = e.Value?.ToString()" />
+                                    </td>
+                                    <td class="text-center">
+                                        <button type="button" class="btn btn-sm btn-outline-danger border-0"
+                                                title="Remove field"
+                                                @onclick="() => RemoveField(index)">✕</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-4 text-body-secondary border rounded mb-3">
+                    <div class="fs-2 mb-2">📋</div>
+                    <div>No fields added yet. Click <strong>+ Add field</strong> to get started.</div>
+                </div>
+            }
+
+            <div class="d-flex gap-2 flex-wrap">
+                <button type="button" class="btn btn-outline-primary" @onclick="AddField">
+                    + Add field
+                </button>
+            </div>
+
+            <div class="d-flex justify-content-end mt-4">
+                <button type="button" class="btn btn-primary" @onclick="GoToStep2"
+                        disabled="@(_fields.Count == 0 || string.IsNullOrWhiteSpace(_schemaName))">
+                    Next: Upload document →
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ── Step 2: Upload document ───────────────────────────────────────────── -->
+@if (CurrentStep == 2)
+{
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-4">
+            <h2 class="h4 mb-1">Upload your document</h2>
+            <p class="text-body-secondary mb-4">
+                Upload the document you want to analyze. Supported formats include PDF, images (JPEG, PNG, TIFF), and Office documents.
+            </p>
+
+            <div class="upload-zone @(_fileName is not null ? "upload-zone-filled" : "")"
+                 onclick="document.getElementById('fileInput').click()">
+                @if (_fileName is not null)
+                {
+                    <div class="fs-2 mb-2">📄</div>
+                    <div class="fw-semibold">@_fileName</div>
+                    <div class="small text-body-secondary mt-1">Click to replace</div>
+                }
+                else
+                {
+                    <div class="fs-2 mb-2">⬆️</div>
+                    <div class="fw-semibold">Drop a file here or click to browse</div>
+                    <div class="small text-body-secondary mt-1">PDF · JPEG · PNG · TIFF · DOCX · XLSX</div>
+                }
+            </div>
+
+            <InputFile id="fileInput" class="d-none" OnChange="OnFileSelected" accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif,.docx,.xlsx" />
+
+            <div class="d-flex justify-content-between mt-4 flex-wrap gap-2">
+                <button type="button" class="btn btn-outline-secondary" @onclick="GoToStep1">
+                    ← Back
+                </button>
+                <button type="button" class="btn btn-primary" @onclick="AnalyzeAsync"
+                        disabled="@(_fileName is null || _analyzing)">
+                    @(_analyzing ? "Analyzing…" : "Analyze document →")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ── Step 3: Results ───────────────────────────────────────────────────── -->
+@if (CurrentStep == 3 && _result is not null)
+{
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-4">
+            <div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
+                <div>
+                    <h2 class="h4 mb-0">Extracted information</h2>
+                    @if (!string.IsNullOrWhiteSpace(_result.Message))
+                    {
+                        <p class="text-body-secondary small mb-0 mt-1">@_result.Message</p>
+                    }
+                </div>
+                @if (string.Equals(_result.Status, "Preview", StringComparison.OrdinalIgnoreCase))
+                {
+                    <span class="badge bg-info text-dark">Preview mode</span>
+                }
+                else
+                {
+                    <span class="badge bg-success">Extracted</span>
+                }
+            </div>
+
+            @if (_result.ExtractedFields.Count > 0)
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Field</th>
+                                <th>Extracted value</th>
+                                <th style="width:130px" class="text-end">Confidence</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var field in _result.ExtractedFields)
+                            {
+                                <tr>
+                                    <td class="fw-semibold">@field.Name</td>
+                                    <td>
+                                        @if (!string.IsNullOrWhiteSpace(field.Value))
+                                        {
+                                            <span>@field.Value</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-body-secondary fst-italic">Not found</span>
+                                        }
+                                    </td>
+                                    <td class="text-end">
+                                        @if (field.Confidence.HasValue)
+                                        {
+                                            var pct = (int)(field.Confidence.Value * 100);
+                                            var badgeClass = pct >= 90 ? "bg-success" : pct >= 70 ? "bg-warning text-dark" : "bg-danger";
+                                            <span class="badge @badgeClass">@pct%</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+
+            <div class="d-flex gap-2 flex-wrap mt-4">
+                <button type="button" class="btn btn-outline-secondary" @onclick="GoToStep2">
+                    ← Analyze another document
+                </button>
+                <button type="button" class="btn btn-outline-primary" @onclick="StartOver">
+                    Start over
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private int CurrentStep { get; set; } = 1;
+
+    private string _schemaName = string.Empty;
+    private List<web.Models.SchemaField> _fields = new List<web.Models.SchemaField>();
+    private string? _fileName;
+    private string? _fileContentBase64;
+    private string _mimeType = "application/octet-stream";
+    private bool _analyzing;
+    private string? _errorMessage;
+    private web.Models.AnalyzeDocumentResponse? _result;
+
+    private void AddField()
+    {
+        _fields.Add(new web.Models.SchemaField { Name = string.Empty, Type = "string" });
+    }
+
+    private void RemoveField(int index)
+    {
+        if (index >= 0 && index < _fields.Count)
+            _fields.RemoveAt(index);
+    }
+
+    private void GoToStep1()
+    {
+        _errorMessage = null;
+        CurrentStep = 1;
+    }
+
+    private void GoToStep2()
+    {
+        _errorMessage = null;
+
+        var invalidFields = _fields.Where(f => string.IsNullOrWhiteSpace(f.Name)).ToList();
+        if (invalidFields.Count > 0)
+        {
+            _errorMessage = "All fields must have a name before proceeding.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_schemaName))
+        {
+            _errorMessage = "Please enter a schema name.";
+            return;
+        }
+
+        CurrentStep = 2;
+    }
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        _errorMessage = null;
+        var file = e.File;
+
+        if (file is null)
+            return;
+
+        const long maxBytes = 20 * 1024 * 1024; // 20 MB
+        if (file.Size > maxBytes)
+        {
+            _errorMessage = $"The file is too large ({file.Size / 1024 / 1024} MB). Maximum allowed size is 20 MB.";
+            return;
+        }
+
+        _fileName = file.Name;
+        _mimeType = file.ContentType is { Length: > 0 } ct ? ct : "application/octet-stream";
+
+        using var stream = file.OpenReadStream(maxBytes);
+        using var ms = new System.IO.MemoryStream();
+        await stream.CopyToAsync(ms);
+        _fileContentBase64 = Convert.ToBase64String(ms.ToArray());
+    }
+
+    private async Task AnalyzeAsync()
+    {
+        _analyzing = true;
+        _errorMessage = null;
+
+        try
+        {
+            var request = new web.Models.AnalyzeDocumentRequest
+            {
+                SchemaName = _schemaName,
+                Fields = _fields,
+                FileName = _fileName ?? "document",
+                FileContentBase64 = _fileContentBase64 ?? string.Empty,
+                MimeType = _mimeType
+            };
+
+            _result = await ContentUnderstandingClient.AnalyzeDocumentAsync(request);
+            CurrentStep = 3;
+        }
+        catch (InvalidOperationException ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _analyzing = false;
+        }
+    }
+
+    private void StartOver()
+    {
+        _schemaName = string.Empty;
+        _fields = new List<web.Models.SchemaField>();
+        _fileName = null;
+        _fileContentBase64 = null;
+        _mimeType = "application/octet-stream";
+        _result = null;
+        _errorMessage = null;
+        CurrentStep = 1;
+    }
+}
