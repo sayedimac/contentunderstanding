@@ -1,0 +1,170 @@
+@page "/"
+@using System.Text.Json
+@inject web.Services.ContentUnderstandingClient ContentUnderstandingClient
+
+<PageTitle>Content Understanding</PageTitle>
+
+<div class="hero-card mb-4">
+    <p class="eyebrow mb-2">Azure Static Web Apps + Azure Functions</p>
+    <h1>Define the schema your users want from their content</h1>
+    <p class="lead mb-0">
+        Authenticated users can submit a JSON field schema to the Functions backend, which uses Azure identity to create or update
+        an Azure Content Understanding analyzer for your Static Web App deployment.
+    </p>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(_errorMessage))
+{
+    <div class="alert alert-danger" role="alert">
+        @_errorMessage
+    </div>
+}
+
+@if (_response is not null)
+{
+    <div class="alert @(string.Equals(_response.Mode, "Preview", StringComparison.OrdinalIgnoreCase) ? "alert-info" : "alert-success")" role="alert">
+        <strong>@_response.Mode:</strong> @_response.Message
+        @if (!string.IsNullOrWhiteSpace(_response.RequestUri))
+        {
+            <div class="mt-2 small text-break">@_response.RequestUri</div>
+        }
+    </div>
+}
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <section class="card shadow-sm border-0">
+            <div class="card-body p-4">
+                <h2 class="h4 mb-3">Schema submission</h2>
+
+                <div class="mb-3">
+                    <label class="form-label" for="analyzerId">Analyzer ID</label>
+                    <input id="analyzerId" class="form-control" @bind="_analyzerId" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label" for="description">Description</label>
+                    <input id="description" class="form-control" @bind="_description" />
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="baseAnalyzerId">Base analyzer</label>
+                        <input id="baseAnalyzerId" class="form-control" @bind="_baseAnalyzerId" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="completionModel">Completion model (optional)</label>
+                        <input id="completionModel" class="form-control" @bind="_completionModel" />
+                    </div>
+                </div>
+
+                <div class="form-check form-switch my-3">
+                    <input id="dynamicFieldSchema" class="form-check-input" type="checkbox" @bind="_dynamicFieldSchema" />
+                    <label class="form-check-label" for="dynamicFieldSchema">Allow dynamic fields outside the supplied schema</label>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label" for="fieldSchema">Field schema (JSON object)</label>
+                    <textarea id="fieldSchema" class="form-control code-editor" @bind="_fieldSchemaText"></textarea>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="button" class="btn btn-primary" @onclick="SubmitAsync" disabled="@_submitting">
+                        @(_submitting ? "Submitting..." : "Submit schema")
+                    </button>
+                    <a class="btn btn-outline-secondary" href="/.auth/login/aad">Sign in with Microsoft Entra ID</a>
+                    <a class="btn btn-outline-secondary" href="/.auth/logout">Sign out</a>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <div class="col-lg-5">
+        <section class="card shadow-sm border-0 h-100">
+            <div class="card-body p-4">
+                <h2 class="h4 mb-3">Azure setup notes</h2>
+                <ol class="small text-body-secondary ps-3">
+                    <li>Create a Microsoft Entra app registration for the Static Web App login flow.</li>
+                    <li>Add the redirect URI <code>https://&lt;your-app&gt;/.auth/login/aad/callback</code>.</li>
+                    <li>Grant the Function app identity <strong>Cognitive Services Contributor</strong> and <strong>Cognitive Services User</strong> access to the Content Understanding resource.</li>
+                    <li>Set <code>CONTENT_UNDERSTANDING_ENDPOINT</code> (and optional Azure client credentials) in the Functions app settings.</li>
+                </ol>
+
+                <h3 class="h5 mt-4">Sample schema</h3>
+                <pre class="response-view">@_fieldSchemaText</pre>
+
+                @if (!string.IsNullOrWhiteSpace(_response?.ResponsePayload))
+                {
+                    <h3 class="h5 mt-4">API response</h3>
+                    <pre class="response-view">@_response.ResponsePayload</pre>
+                }
+            </div>
+        </section>
+    </div>
+</div>
+
+@code {
+    private string _analyzerId = "contract-review";
+    private string _description = "Extract renewal, billing, and approval data from agreements.";
+    private string _baseAnalyzerId = "prebuilt-document";
+    private string _completionModel = string.Empty;
+    private bool _dynamicFieldSchema;
+    private bool _submitting;
+    private string? _errorMessage;
+    private web.Models.SchemaSubmissionResponse? _response;
+    private string _fieldSchemaText = """
+        {
+          "contractTitle": {
+            "type": "string",
+            "description": "Title or short name of the agreement"
+          },
+          "effectiveDate": {
+            "type": "date",
+            "description": "Date the agreement becomes active"
+          },
+          "renewalNoticeDays": {
+            "type": "integer",
+            "description": "Days required for non-renewal notice"
+          },
+          "totalValue": {
+            "type": "number",
+            "description": "Total contract value"
+          },
+          "approvers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+        """;
+
+    private async Task SubmitAsync()
+    {
+        _submitting = true;
+        _errorMessage = null;
+
+        try
+        {
+            _response = await ContentUnderstandingClient.SubmitSchemaAsync(
+                _analyzerId,
+                _description,
+                _baseAnalyzerId,
+                _completionModel,
+                _dynamicFieldSchema,
+                _fieldSchemaText);
+        }
+        catch (JsonException)
+        {
+            _errorMessage = "FieldSchema must contain valid JSON before it can be submitted.";
+        }
+        catch (InvalidOperationException exception)
+        {
+            _errorMessage = exception.Message;
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+}

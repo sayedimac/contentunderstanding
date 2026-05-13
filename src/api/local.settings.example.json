@@ -1,0 +1,12 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "CONTENT_UNDERSTANDING_ENDPOINT": "https://<your-foundry-resource>.services.ai.azure.com/",
+    "CONTENT_UNDERSTANDING_API_VERSION": "2025-11-01",
+    "AZURE_TENANT_ID": "<optional-if-using-app-registration>",
+    "AZURE_CLIENT_ID": "<optional-if-using-app-registration>",
+    "AZURE_CLIENT_SECRET": "<optional-if-using-app-registration>"
+  }
+}
